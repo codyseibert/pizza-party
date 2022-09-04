@@ -74,6 +74,9 @@ const useController = ({
         model.toppings.filter((topping) => model.selectedToppings[topping.name])
       );
     },
+    getTopping(name: string): TTopping | undefined {
+      return model.toppings.find((topping) => topping.name === name);
+    },
     get isAllSelected() {
       return Object.entries(model.selectedToppings).every(
         ([key, value]) => value
@@ -157,7 +160,7 @@ export const ToppingsModalControllerProxy = ({
                   type="checkbox"
                 />
                 <label htmlFor={toppingKey} key={toppingKey}>
-                  {toppingKey}
+                  {toppingKey} ${controller.getTopping(toppingKey)?.cost}
                 </label>
               </div>
             ))}
