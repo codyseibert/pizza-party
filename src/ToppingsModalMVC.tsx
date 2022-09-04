@@ -1,5 +1,4 @@
 import { Dialog } from "@headlessui/react";
-import React, { FC, useEffect, useState } from "react";
 import { getToppings, TTopping } from "./api/getToppings";
 import { MVCWrapper } from "./MVCWrapper";
 
@@ -11,9 +10,8 @@ type Props = {
 
 const context = ({ onConfirm, onClose, confirmedToppings }: Props) => {
   return {
-    async getToppings() {
-      const allToppings = await getToppings();
-      return allToppings;
+    getToppings() {
+      return getToppings();
     },
     onConfirm,
     confirmedToppings,
@@ -60,7 +58,9 @@ export const controller = (model: Model, context: Context) => {
           [toppingKey]: isChecked,
         };
       },
-      handleOnClose() {},
+      handleOnClose() {
+        context.onClose();
+      },
       handleConfirmClick() {
         context.onConfirm(
           model.toppings.filter(

@@ -36,37 +36,41 @@ export const ToppingsModal = ({
     });
   }, []);
 
-  const toggleAll = (e: React.ChangeEvent<HTMLInputElement>) => {
+  function toggleAll(e: React.ChangeEvent<HTMLInputElement>) {
     setSelectedToppings(
       toppings.reduce(
         (obj, topping) => ({ ...obj, [topping.name]: e.target.checked }),
         {}
       )
     );
-  };
+  }
 
-  const toggleTopping =
-    (toppingKey: string) => (e: React.ChangeEvent<HTMLInputElement>) => {
+  function toggleTopping(toppingKey: string) {
+    return function (e: React.ChangeEvent<HTMLInputElement>) {
       setSelectedToppings({
         ...selectedToppings,
         [toppingKey]: e.target.checked,
       });
     };
+  }
+
+  function handleConfirmClick() {
+    onConfirm(toppings.filter((topping) => selectedToppings[topping.name]));
+  }
+
+  function handleOnClose() {
+    onClose();
+  }
 
   const toppingKeys = toppings.map((topping) => topping.name);
   const isToppingSelected = Object.entries(selectedToppings).some(
     ([, checked]) => checked
   );
-
   const totalUpcharge = toppings
     .reduce((sum, topping) => {
       return sum + (selectedToppings[topping.name] ? topping.cost : 0);
     }, 0)
     .toFixed(2);
-
-  const handleConfirmClick = () => {
-    onConfirm(toppings.filter((topping) => selectedToppings[topping.name]));
-  };
 
   return (
     <Dialog open={true} onClose={onClose} className="relative z-50">
@@ -110,7 +114,7 @@ export const ToppingsModal = ({
             <button className="btn btn-success" onClick={handleConfirmClick}>
               Confirm
             </button>
-            <button className="btn" onClick={onClose}>
+            <button className="btn" onClick={handleOnClose}>
               Cancel
             </button>
           </div>

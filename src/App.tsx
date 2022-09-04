@@ -2,6 +2,8 @@ import { useState } from "react";
 import { TTopping } from "./api/getToppings";
 import { ToppingsModal } from "./ToppingsModal";
 import { ToppingsModalMVC } from "./ToppingsModalMVC";
+import { ToppingsModalController } from "./ToppingsModalController";
+import { ToppingsModalControllerProxy } from "./ToppingsModalControllerProxy";
 
 function App() {
   const [showModal, setShowModal] = useState(false);
@@ -19,7 +21,7 @@ function App() {
   return (
     <div className="App p-40">
       {showModal && (
-        <ToppingsModal
+        <ToppingsModalControllerProxy
           onClose={handleModalClose}
           onConfirm={handleModalConfirm}
           confirmedToppings={confirmedToppings}
