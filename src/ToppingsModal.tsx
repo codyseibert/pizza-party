@@ -1,76 +1,135 @@
 import { Dialog } from "@headlessui/react";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { getToppings, TTopping } from "./api/getToppings";
+import { derived, useController } from "./hooks/useController";
+import { useOnMount } from "./hooks/useOnMount";
+import { useProxyState } from "./hooks/useProxyState";
 
-type Props = {
-  onClose: () => void;
-  onConfirm: (selectedToppings: TTopping[]) => void;
-  confirmedToppings: TTopping[];
+type Model = {
+  toppings: TTopping[];
+  selectedToppings: Record<string, boolean>;
+};
+
+export const controller = ({
+  model,
+  onConfirm = () => {},
+  initialSelectedToppings,
+  getToppings,
+}: {
+  model: Model;
+  onConfirm?: (selectedToppings: TTopping[]) => void;
+  initialSelectedToppings: string[];
+  getToppings: () => Promise<TTopping[]>;
+}) => {
+  async function onMount() {
+    const toppings = await getToppings();
+    model.toppings = toppings;
+    model.selectedToppings = Object.fromEntries(
+      toppings.map(({ name }) => [
+        name,
+        initialSelectedToppings.some((topping) => topping === name),
+      ])
+    );
+  }
+
+  function onUnmount() {
+    model.toppings = [];
+    model.selectedToppings = {};
+  }
+
+  function toggleTopping(toppingKey: string, isChecked: boolean) {
+    model.selectedToppings[toppingKey] = isChecked;
+  }
+
+  function handleConfirmClick() {
+    onConfirm(
+      model.toppings.filter(({ name }) => model.selectedToppings[name])
+    );
+  }
+
+  function getTopping(name: string): TTopping | undefined {
+    return model.toppings.find((topping) => topping.name === name);
+  }
+
+  function isToppingSelected(name: string) {
+    return model.selectedToppings[name];
+  }
+
+  function toggleAll(isChecked: boolean) {
+    toppingKeys().forEach((toppingName) => {
+      toggleTopping(toppingName, isChecked);
+    });
+  }
+
+  const toppingKeys = () => model.toppings.map((topping) => topping.name);
+  const isAllSelected = () =>
+    toppingKeys().every((name) => isToppingSelected(name));
+  const isAnyToppingSelected = () =>
+    Object.values(model.selectedToppings).some((isChecked) => isChecked);
+  const totalUpcharge = () =>
+    model.toppings
+      .reduce(
+        (sum, topping) =>
+          sum + (isToppingSelected(topping.name) ? topping.cost : 0),
+        0
+      )
+      .toFixed(2);
+
+  return {
+    onMount,
+    onUnmount,
+    toggleTopping,
+    handleConfirmClick,
+    toggleAll,
+    ...derived({
+      getTopping,
+      isToppingSelected,
+      isAllSelected,
+      toppingKeys,
+      isAnyToppingSelected,
+      totalUpcharge,
+    }),
+  };
 };
 
 export const ToppingsModal = ({
   onConfirm,
   onClose,
-  confirmedToppings = [],
-}: Props) => {
-  const [toppings, setToppings] = useState<TTopping[]>([]);
-  const [selectedToppings, setSelectedToppings] = useState<
-    Record<string, boolean>
-  >({});
-
-  useEffect(() => {
-    getToppings().then((allToppings) => {
-      setToppings(allToppings);
-      setSelectedToppings(
-        allToppings.reduce((obj, topping) => {
-          return {
-            ...obj,
-            [topping.name]: confirmedToppings.find(
-              (confirmed) => confirmed.name === topping.name
-            )
-              ? true
-              : false,
-          };
-        }, {})
-      );
-    });
-  }, []);
-
-  function toggleAll(e: React.ChangeEvent<HTMLInputElement>) {
-    setSelectedToppings(
-      toppings.reduce(
-        (obj, topping) => ({ ...obj, [topping.name]: e.target.checked }),
-        {}
-      )
-    );
-  }
-
-  function toggleTopping(toppingKey: string) {
-    return function (e: React.ChangeEvent<HTMLInputElement>) {
-      setSelectedToppings({
-        ...selectedToppings,
-        [toppingKey]: e.target.checked,
-      });
-    };
-  }
-
-  function handleConfirmClick() {
-    onConfirm(toppings.filter((topping) => selectedToppings[topping.name]));
-  }
-
-  function handleOnClose() {
-    onClose();
-  }
-
-  const toppingKeys = toppings.map((topping) => topping.name);
-  const isToppingSelected = Object.entries(selectedToppings).some(
-    ([, checked]) => checked
+  initialSelectedToppings = [],
+}: {
+  onClose: () => void;
+  onConfirm: (selectedToppings: TTopping[]) => void;
+  initialSelectedToppings: string[];
+}) => {
+  const model = useMemo(
+    () => ({
+      toppings: [] as TTopping[],
+      selectedToppings: [] as string[],
+    }),
+    []
   );
-  const totalUpcharge = toppings
-    .reduce((sum, topping) => {
-      return sum + (selectedToppings[topping.name] ? topping.cost : 0);
-    }, 0)
-    .toFixed(2);
+
+  const {
+    getTopping,
+    handleConfirmClick,
+    isAllSelected,
+    isAnyToppingSelected,
+    isToppingSelected,
+    onMount,
+    toggleAll,
+    toggleTopping,
+    toppingKeys,
+    onUnmount,
+    totalUpcharge,
+  } = useController({
+    model,
+    controller,
+    initialSelectedToppings,
+    onConfirm,
+    getToppings,
+  }) as ReturnType<typeof controller>;
+
+  useOnMount(onMount, onUnmount);
 
   return (
     <Dialog open={true} onClose={onClose} className="relative z-50">
@@ -83,29 +142,34 @@ export const ToppingsModal = ({
           <div className="mb-6 h-10 flex flex-col gap-2">
             <p>Please select the toppings you want on your pizza.</p>
 
-            {isToppingSelected && (
+            {isAnyToppingSelected() && (
               <p>
-                There will be an upcharge of <b>${totalUpcharge}</b>
+                There will be an upcharge of <b>${totalUpcharge()}</b>
               </p>
             )}
           </div>
 
           <div className="flex flex-col gap-4">
             <div className="flex gap-2">
-              <input onChange={toggleAll} id="select-all" type="checkbox" />
+              <input
+                onChange={(e) => toggleAll(e.target.checked)}
+                id="select-all"
+                type="checkbox"
+                checked={isAllSelected()}
+              />
               <label htmlFor="select-all">Select All</label>
             </div>
 
-            {toppingKeys.map((toppingKey) => (
+            {toppingKeys().map((toppingKey) => (
               <div key={toppingKey} className="flex gap-2">
                 <input
-                  checked={selectedToppings[toppingKey] ?? false}
-                  onChange={toggleTopping(toppingKey)}
+                  checked={isToppingSelected(toppingKey)}
+                  onChange={(e) => toggleTopping(toppingKey, e.target.checked)}
                   id={toppingKey}
                   type="checkbox"
                 />
                 <label htmlFor={toppingKey} key={toppingKey}>
-                  {toppingKey}
+                  {toppingKey} ${getTopping(toppingKey)?.cost}
                 </label>
               </div>
             ))}
@@ -114,7 +178,7 @@ export const ToppingsModal = ({
             <button className="btn btn-success" onClick={handleConfirmClick}>
               Confirm
             </button>
-            <button className="btn" onClick={handleOnClose}>
+            <button className="btn" onClick={onClose}>
               Cancel
             </button>
           </div>
